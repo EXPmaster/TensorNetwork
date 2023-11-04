@@ -168,10 +168,10 @@ class PyTorchBackend(abstract_backend.AbstractBackend):
     return torchlib.empty(shape, dtype=dtype).uniform_(*boundaries)
 
   def conj(self, tensor: Tensor) -> Tensor:
-    return tensor  #pytorch does not support complex dtypes
+    return tensor.conj()
 
   def eigh(self, matrix: Tensor) -> Tuple[Tensor, Tensor]:
-    return matrix.symeig(eigenvectors=True)
+    return torchlib.linalg.eigh(matrix, UPLO='U')  # matrix.symeig(eigenvectors=True)
 
   def eigsh_lanczos(self,
                     A: Callable,
@@ -259,12 +259,12 @@ class PyTorchBackend(abstract_backend.AbstractBackend):
       #store the Lanczos vector for later
       if reorthogonalize:
         for v in krylov_vecs:
-          vector_n -= (v.contiguous().view(-1).dot(
+          vector_n -= (v.conj().contiguous().view(-1).dot(
               vector_n.contiguous().view(-1))) * torchlib.reshape(
                   v, vector_n.shape)
       krylov_vecs.append(vector_n)
       A_vector_n = A(vector_n, *args)
-      diag_elements.append(vector_n.contiguous().view(-1).dot(
+      diag_elements.append(vector_n.conj().contiguous().view(-1).dot(
           A_vector_n.contiguous().view(-1)))
 
       if ((it > 0) and (it % ndiag) == 0) and (len(diag_elements) >= numeig):
@@ -272,8 +272,9 @@ class PyTorchBackend(abstract_backend.AbstractBackend):
         A_tridiag = torchlib.diag(
             torchlib.tensor(diag_elements)) + torchlib.diag(
                 torchlib.tensor(norms_vector_n[1:]), 1) + torchlib.diag(
-                    torchlib.tensor(norms_vector_n[1:]), -1)
-        eigvals, u = A_tridiag.symeig(eigenvectors=True)
+                    torchlib.tensor(norms_vector_n[1:]).conj(), -1)
+        eigvals, u = torchlib.linalg.eigh(A_tridiag, UPLO='U')
+        eigvals = eigvals.type(A_tridiag.dtype)
         if not first:
           if torchlib.norm(eigvals[0:numeig] - eigvalsold[0:numeig]) < tol:
             break
@@ -288,15 +289,16 @@ class PyTorchBackend(abstract_backend.AbstractBackend):
 
     A_tridiag = torchlib.diag(torchlib.tensor(diag_elements)) + torchlib.diag(
         torchlib.tensor(norms_vector_n[1:]), 1) + torchlib.diag(
-            torchlib.tensor(norms_vector_n[1:]), -1)
-    eigvals, u = A_tridiag.symeig(eigenvectors=True)
+            torchlib.tensor(norms_vector_n[1:]).conj(), -1)
+    eigvals, u = torchlib.linalg.eigh(A_tridiag, UPLO='U')
+    eigvals = eigvals.type(A_tridiag.dtype)
     eigenvectors = []
     for n2 in range(min(numeig, len(eigvals))):
       state = self.zeros(initial_state.shape, initial_state.dtype)
       for n1, vec in enumerate(krylov_vecs):
         state += vec * u[n1, n2]
       eigenvectors.append(state / torchlib.norm(state))
-    return eigvals[0:numeig], eigenvectors
+    return eigvals[0:numeig].cpu(), eigenvectors
 
   def addition(self, tensor1: Tensor, tensor2: Tensor) -> Tensor:
     return tensor1 + tensor2

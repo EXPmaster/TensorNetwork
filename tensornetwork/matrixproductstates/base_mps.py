@@ -300,6 +300,7 @@ class BaseMPS:
     """
     if not len(ops) == len(sites):
       raise ValueError('measure_1site_ops: len(ops) has to be len(sites)!')
+    ops = [self.backend.convert_to_tensor(op).type(self.dtype) for op in ops]
     right_envs = self.right_envs(sites)
     left_envs = self.left_envs(sites)
     res = []
