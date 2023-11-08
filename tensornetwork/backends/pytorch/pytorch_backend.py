@@ -171,7 +171,7 @@ class PyTorchBackend(abstract_backend.AbstractBackend):
     return tensor.conj()
 
   def eigh(self, matrix: Tensor) -> Tuple[Tensor, Tensor]:
-    return torchlib.linalg.eigh(matrix, UPLO='U')  # matrix.symeig(eigenvectors=True)
+    return torchlib.linalg.eigh(matrix)  # matrix.symeig(eigenvectors=True)
 
   def eigsh_lanczos(self,
                     A: Callable,
@@ -273,7 +273,7 @@ class PyTorchBackend(abstract_backend.AbstractBackend):
             torchlib.tensor(diag_elements)) + torchlib.diag(
                 torchlib.tensor(norms_vector_n[1:]), 1) + torchlib.diag(
                     torchlib.tensor(norms_vector_n[1:]).conj(), -1)
-        eigvals, u = torchlib.linalg.eigh(A_tridiag, UPLO='U')
+        eigvals, u = torchlib.linalg.eigh(A_tridiag)
         eigvals = eigvals.type(A_tridiag.dtype)
         if not first:
           if torchlib.norm(eigvals[0:numeig] - eigvalsold[0:numeig]) < tol:
@@ -290,7 +290,7 @@ class PyTorchBackend(abstract_backend.AbstractBackend):
     A_tridiag = torchlib.diag(torchlib.tensor(diag_elements)) + torchlib.diag(
         torchlib.tensor(norms_vector_n[1:]), 1) + torchlib.diag(
             torchlib.tensor(norms_vector_n[1:]).conj(), -1)
-    eigvals, u = torchlib.linalg.eigh(A_tridiag, UPLO='U')
+    eigvals, u = torchlib.linalg.eigh(A_tridiag)
     eigvals = eigvals.type(A_tridiag.dtype)
     eigenvectors = []
     for n2 in range(min(numeig, len(eigvals))):
@@ -358,7 +358,7 @@ class PyTorchBackend(abstract_backend.AbstractBackend):
     if (tensor1.ndim <= 1) or (tensor2.ndim <= 1):
       raise ValueError("inputs to `matmul` have to be a tensors of order > 1,")
 
-    return torchlib.einsum('...ab,...bc->...ac', tensor1, tensor2)
+    return torchlib.matmul(tensor1, tensor2)
 
   def diagonal(self, tensor: Tensor, offset: int = 0, axis1: int = -2,
                axis2: int = -1) -> Tensor:

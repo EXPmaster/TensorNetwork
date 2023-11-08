@@ -24,11 +24,11 @@ def _iterative_classical_gram_schmidt(jax: types.ModuleType) -> Callable:
 
   JaxPrecisionType = type(jax.lax.Precision.DEFAULT)
   def iterative_classical_gram_schmidt(
-      vector: jax.ShapedArray,
-      krylov_vectors: jax.ShapedArray,
+      vector: jax.core.ShapedArray,
+      krylov_vectors: jax.core.ShapedArray,
       precision: JaxPrecisionType,
       iterations: int = 2,
-      ) -> jax.ShapedArray:
+      ) -> jax.core.ShapedArray:
     """
     Orthogonalize `vector`  to all rows of `krylov_vectors`.
 
@@ -92,9 +92,9 @@ def _generate_jitted_eigsh_lanczos(jax: types.ModuleType) -> Callable:
   JaxPrecisionType = type(jax.lax.Precision.DEFAULT)
 
   @functools.partial(jax.jit, static_argnums=(3, 4, 5, 6, 7))
-  def jax_lanczos(matvec: Callable, arguments: List, init: jax.ShapedArray,
+  def jax_lanczos(matvec: Callable, arguments: List, init: jax.core.ShapedArray,
                   ncv: int, neig: int, landelta: float, reortho: bool,
-                  precision: JaxPrecisionType) -> Tuple[jax.ShapedArray, List]:
+                  precision: JaxPrecisionType) -> Tuple[jax.core.ShapedArray, List]:
     """
     Lanczos iteration for symmeric eigenvalue problems. If reortho = False,
     the Krylov basis is constructed without explicit re-orthogonalization. 
@@ -219,8 +219,9 @@ def _generate_jitted_eigsh_lanczos(jax: types.ModuleType) -> Callable:
       krv, unitary, vectors = vals
       dim = unitary.shape[1]
       n, m = jax.numpy.divmod(i, dim)
-      vectors = jax.ops.index_add(vectors, jax.ops.index[n, :],
-                                  krv[m + 1] * unitary[m, n])
+      # vectors = jax.ops.index_add(vectors, jax.ops.index[n, :],
+      #                             krv[m + 1] * unitary[m, n])
+      vectors = vectors.at[n, :].add(krv[m + 1] * unitary[m, n])
       return [krv, unitary, vectors]
 
     _vectors = jax.numpy.zeros((neig,) + shape, dtype=dtype)
@@ -247,8 +248,8 @@ def _generate_lanczos_factorization(jax: types.ModuleType) -> Callable:
 
   @functools.partial(jax.jit, static_argnums=(6, 7, 8, 9))
   def _lanczos_fact(
-      matvec: Callable, args: List, v0: jax.ShapedArray,
-      Vm: jax.ShapedArray, alphas: jax.ShapedArray, betas: jax.ShapedArray,
+      matvec: Callable, args: List, v0: jax.core.ShapedArray,
+      Vm: jax.core.ShapedArray, alphas: jax.core.ShapedArray, betas: jax.core.ShapedArray,
       start: int, num_krylov_vecs: int, tol: float, precision: JaxPrecisionType
   ):
     """
@@ -613,8 +614,9 @@ def _get_vectors(jax):
     def body_vector(i, states):
       dim = unitary.shape[1]
       n, m = jax.numpy.divmod(i, dim)
-      states = jax.ops.index_add(states, jax.ops.index[n, :],
-                                 Vm[m, :] * unitary[m, inds[n]])
+      # states = jax.ops.index_add(states, jax.ops.index[n, :],
+      #                            Vm[m, :] * unitary[m, inds[n]])
+      states = states.at[n, :].add(Vm[m, :] * unitary[m, inds[n]])
       return states
 
     state_vectors = jax.numpy.zeros([numeig, Vm.shape[1]], dtype=Vm.dtype)
@@ -1261,9 +1263,11 @@ def gmres_wrapper(jax: types.ModuleType):
     # sine: givens[1, :]
     givens = jnp.zeros((2, n_kry), dtype=x0.dtype)
     beta_vec = jnp.zeros((n_kry + 1), dtype=x0.dtype)
-    beta_vec = jax.ops.index_update(beta_vec, jax.ops.index[0], beta)
+    # beta_vec = jax.ops.index_update(beta_vec, jax.ops.index[0], beta)
+    beta_vec = beta_vec.at[0].set(beta)
     V = jnp.zeros((n, n_kry + 1), dtype=x0.dtype)
-    V = jax.ops.index_update(V, jax.ops.index[:, 0], v)
+    # V = jax.ops.index_update(V, jax.ops.index[:, 0], v)
+    V = V.at[:, 0].set(v)
     R = jnp.zeros((n_kry + 1, n_kry), dtype=x0.dtype)
 
     # The variable data for the carry call. Each iteration modifies these
@@ -1293,12 +1297,15 @@ def gmres_wrapper(jax: types.ModuleType):
 
       V, H = kth_arnoldi_step(k, A_mv, A_args, V, R, tol, precision)
       R_col, givens = apply_givens_rotation(H[:, k], givens, k)
-      R = jax.ops.index_update(R, jax.ops.index[:, k], R_col[:])
+      # R = jax.ops.index_update(R, jax.ops.index[:, k], R_col[:])
+      R = R.at[:, k].set(R_col[:])
 
       # Update the residual vector.
       cs, sn = givens[:, k] * beta_vec[k]
-      beta_vec = jax.ops.index_update(beta_vec, jax.ops.index[k], cs)
-      beta_vec = jax.ops.index_update(beta_vec, jax.ops.index[k + 1], sn)
+      # beta_vec = jax.ops.index_update(beta_vec, jax.ops.index[k], cs)
+      # beta_vec = jax.ops.index_update(beta_vec, jax.ops.index[k + 1], sn)
+      beta_vec = beta_vec.at[k].set(cs)
+      beta_vec = beta_vec.at[k + 1].set(sn)
       err = jnp.abs(sn) / b_norm
       gmres_variables = (k + 1, V, R, beta_vec, err, givens)
       return (gmres_variables, gmres_constants)
@@ -1395,9 +1402,12 @@ def gmres_wrapper(jax: types.ModuleType):
                          lambda x: 0.*x[0],
                          (v_new, v_norm)
                          )
-    H = jax.ops.index_update(H, jax.ops.index[:, k], H_k)
-    H = jax.ops.index_update(H, jax.ops.index[k+1, k], v_norm)
-    V = jax.ops.index_update(V, jax.ops.index[:, k+1], r_new)
+    # H = jax.ops.index_update(H, jax.ops.index[:, k], H_k)
+    # H = jax.ops.index_update(H, jax.ops.index[k+1, k], v_norm)
+    # V = jax.ops.index_update(V, jax.ops.index[:, k+1], r_new)
+    H = H.at[:, k].set(H_k)
+    H = H.at[k+1, k].set(v_norm)
+    V = V.at[:, k+1].set(r_new)
     return V, H
 
 ####################################################################
@@ -1429,8 +1439,10 @@ def gmres_wrapper(jax: types.ModuleType):
       sn = givens[1, i]
       H_i = cs * H_col[i] - sn * H_col[i + 1]
       H_ip1 = sn * H_col[i] + cs * H_col[i + 1]
-      H_col = jax.ops.index_update(H_col, jax.ops.index[i], H_i)
-      H_col = jax.ops.index_update(H_col, jax.ops.index[i + 1], H_ip1)
+      # H_col = jax.ops.index_update(H_col, jax.ops.index[i], H_i)
+      # H_col = jax.ops.index_update(H_col, jax.ops.index[i + 1], H_ip1)
+      H_col = H_col.at[i].set(H_i)
+      H_col = H_col.at[i + 1].set(H_ip1)
       return (H_col, i + 1, k, givens)
 
     rotation_carry = jax.lax.while_loop(loop_condition,
@@ -1465,12 +1477,16 @@ def gmres_wrapper(jax: types.ModuleType):
     H_col = apply_rotations(H_col, givens, k)
 
     cs_k, sn_k = givens_rotation(H_col[k], H_col[k + 1])
-    givens = jax.ops.index_update(givens, jax.ops.index[0, k], cs_k)
-    givens = jax.ops.index_update(givens, jax.ops.index[1, k], sn_k)
+    # givens = jax.ops.index_update(givens, jax.ops.index[0, k], cs_k)
+    # givens = jax.ops.index_update(givens, jax.ops.index[1, k], sn_k)
+    givens = givens.at[0, k].set(cs_k)
+    givens = givens.at[1, k].set(sn_k)
 
     r_k = cs_k * H_col[k] - sn_k * H_col[k + 1]
-    R_col = jax.ops.index_update(H_col, jax.ops.index[k], r_k)
-    R_col = jax.ops.index_update(R_col, jax.ops.index[k + 1], 0.)
+    # R_col = jax.ops.index_update(H_col, jax.ops.index[k], r_k)
+    # R_col = jax.ops.index_update(R_col, jax.ops.index[k + 1], 0.)
+    R_col = H_col.at[k].set(r_k)
+    R_col = R_col.at[k + 1].set(0.)
     return R_col, givens
 
   @jax.jit

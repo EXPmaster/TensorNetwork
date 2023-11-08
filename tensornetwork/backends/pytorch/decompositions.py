@@ -80,7 +80,7 @@ def svd(
   right_dims = list(tensor.shape)[pivot_axis:]
 
   tensor = torch.reshape(tensor, (np.prod(left_dims), np.prod(right_dims)))
-  u, s, v = torch.svd(tensor)
+  u, s, vh = torch.linalg.svd(tensor, full_matrices=False)
 
   if max_singular_values is None:
     max_singular_values = s.nelement()
@@ -110,9 +110,7 @@ def svd(
   s_rest = s[num_sing_vals_keep:]
   s = s[:num_sing_vals_keep]
   u = u[:, :num_sing_vals_keep]
-  v = v[:, :num_sing_vals_keep]
-
-  vh = torch.transpose(v, 0, 1)
+  vh = vh[:num_sing_vals_keep, :]
 
   dim_s = s.shape[0]
   u = torch.reshape(u, left_dims + [dim_s])
@@ -213,8 +211,8 @@ def rq(
     phases = torch.sign(torch.diagonal(r))
     q = q * phases
     r = phases.conj()[:, None] * r
-  r, q = torch.transpose(r.conj(), 0, 1), torch.transpose(q.conj(), 0,
-                                                   1)  #M=r*q at this point
+  r, q = torch.transpose(r, 0, 1).conj(), torch.transpose(q, 0,
+                                                   1).conj()  #M=r*q at this point
   center_dim = r.shape[1]
   r = torch.reshape(r, list(left_dims) + [center_dim])
   q = torch.reshape(q, [center_dim] + list(right_dims))
