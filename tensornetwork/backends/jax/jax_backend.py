@@ -126,6 +126,9 @@ class JaxBackend(abstract_backend.AbstractBackend):
     result = jnp.asarray(tensor)
     return result
 
+  def convert_to_numpy(self, tensor: Tensor) -> Tensor:
+    return np.asarray(tensor)
+
   def outer_product(self, tensor1: Tensor, tensor2: Tensor) -> Tensor:
     return jnp.tensordot(tensor1, tensor2, 0,
                          precision=self.jax_precision)

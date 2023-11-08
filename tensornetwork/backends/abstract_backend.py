@@ -199,6 +199,11 @@ class AbstractBackend:
     raise NotImplementedError(
         "Backend '{}' has not implemented convert_to_tensor.".format(self.name))
 
+  def convert_to_numpy(self, tensor: Tensor) -> Tensor:
+    """Convert a np.array or a tensor to a tensor type for the backend."""
+    raise NotImplementedError(
+        "Backend '{}' has not implemented convert_to_numpy.".format(self.name))
+
   def outer_product(self, tensor1: Tensor, tensor2: Tensor) -> Tensor:
     """Calculate the outer product of the two given tensors."""
     raise NotImplementedError(

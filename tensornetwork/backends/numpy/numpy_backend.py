@@ -95,6 +95,9 @@ class NumPyBackend(abstract_backend.AbstractBackend):
           type(tensor)))
     result = np.asarray(tensor)
     return result
+  
+  def convert_to_numpy(self, tensor: Tensor) -> Tensor:
+    return tensor
 
   def outer_product(self, tensor1: Tensor, tensor2: Tensor) -> Tensor:
     return np.tensordot(tensor1, tensor2, 0)

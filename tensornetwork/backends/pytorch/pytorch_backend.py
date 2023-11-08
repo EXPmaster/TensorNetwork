@@ -117,6 +117,9 @@ class PyTorchBackend(abstract_backend.AbstractBackend):
     result = torchlib.as_tensor(tensor)
     return result
 
+  def convert_to_numpy(self, tensor: Tensor) -> Tensor:
+    return tensor.cpu().numpy()
+
   def outer_product(self, tensor1: Tensor, tensor2: Tensor) -> Tensor:
     return torchlib.tensordot(tensor1, tensor2, dims=0)
   # pylint: disable=unused-argument
