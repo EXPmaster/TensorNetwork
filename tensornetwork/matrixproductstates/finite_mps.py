@@ -13,6 +13,7 @@
 # limitations under the License.
 import numpy as np
 import functools
+import pickle
 
 from tensornetwork.network_components import Node, contract_between
 from tensornetwork.backends import backend_factory
@@ -313,5 +314,14 @@ class FiniteMPS(BaseMPS):
           right_envs[site - 1] = right_env
     return {k: v.tensor for k, v in right_envs.items()}
 
-  def save(self, path: str):
-    raise NotImplementedError()
+  def save(self, path: str) -> None:
+    tensors = [self.backend.convert_to_numpy(tensor) for tensor in self.tensors]
+    data = {'tensors': tensors, 'center_position': self.center_position}
+    with open(path, 'wb') as f:
+      pickle.dump(data, f)
+
+  @classmethod
+  def load(cls, path: str) -> BaseMPS:
+    with open(path, 'rb') as f:
+      data = pickle.load(f)
+    return cls(**data)
