@@ -232,7 +232,11 @@ class BaseMPS:
 
     return self.tensors[0].dtype
 
-  def save(self, path: str):
+  def save(self, path: str) -> None:
+    raise NotImplementedError()
+
+  @classmethod
+  def load(cls, path: str, backend: Optional[Union[Text, AbstractBackend]] = None):
     raise NotImplementedError()
 
   def bond_dimension(self, bond) -> List:
@@ -612,6 +616,9 @@ class BaseMPS:
     self.tensors[site] = ncon.ncon([gate, self.tensors[site]],
                                    [[-2, 1], [-1, 1, -3]],
                                    backend=self.backend.name)
+  
+  def fidelity(self, other: Tensor) -> float:
+    raise NotImplementedError()
 
   def check_orthonormality(self, which: Text, site: int) -> Tensor:
     """Check orthonormality of tensor at site `site`.

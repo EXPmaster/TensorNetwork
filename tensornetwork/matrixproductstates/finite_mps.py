@@ -321,7 +321,27 @@ class FiniteMPS(BaseMPS):
       pickle.dump(data, f)
 
   @classmethod
-  def load(cls, path: str) -> BaseMPS:
+  def load(cls, path: str, backend: Optional[Union[Text, AbstractBackend]] = None) -> BaseMPS:
     with open(path, 'rb') as f:
       data = pickle.load(f)
+    data['backend'] = backend
     return cls(**data)
+
+  def fidelity(self, other: Tensor) -> float:
+    if isinstance(other, BaseMPS):
+      other = other.tensors
+    this = [Node(tensor, backend=self.backend) for tensor in self.tensors]
+    other_conj = [Node(self.backend.conj(tensor), backend=self.backend) for tensor in other]
+
+    for site in range(len(self.tensors) - 1):
+      this[site][2] ^ this[site + 1][0]
+      other_conj[site][2] ^ other_conj[site + 1][0]
+      this[site][1] ^ other_conj[site][1]
+    this[-1][1] ^ other_conj[-1][1]
+
+    result = contract_between(this[0], other_conj[0])
+    for site in range(1, len(self.tensors)):
+      result = contract_between(result, this[site])
+      result = contract_between(result, other_conj[site])
+
+    return self.backend.item(self.backend.abs(result.tensor)) ** 2
