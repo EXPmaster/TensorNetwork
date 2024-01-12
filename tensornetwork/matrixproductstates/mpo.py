@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """implementation of different Matrix Product Operators."""
+import pickle
 import numpy as np
 from tensornetwork.backends import backend_factory
 from tensornetwork.backend_contextmanager import get_default_backend
@@ -72,6 +73,24 @@ class BaseMPO:
         The vector will have length `N+1`, where `N == num_sites`."""
     return [self.tensors[0].shape[0]
            ] + [tensor.shape[1] for tensor in self.tensors]
+  
+  def save(self, path: Text) -> None:
+    """
+    Save the MPO to disk.
+    Args:
+      path: The path to save the MPO to.
+    """
+    tensors = [self.backend.convert_to_numpy(tensor) for tensor in self.tensors]
+    data = {'tensors': tensors, 'name': self.name}
+    with open(path, 'wb') as f:
+      pickle.dump(data, f)
+  
+  @classmethod
+  def load(cls, path: Text, backend: Optional[Union[Text, AbstractBackend]] = None):
+    with open(path, 'rb') as f:
+      data = pickle.load(f)
+    data['backend'] = backend
+    return cls(**data)
 
 
 class InfiniteMPO(BaseMPO):
