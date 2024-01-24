@@ -16,6 +16,7 @@ import functools
 import pickle
 
 from tensornetwork.network_components import Node, contract_between
+from tensornetwork.network_operations import split_node
 from tensornetwork.backends import backend_factory
 from tensornetwork.linalg.node_linalg import conj
 from typing import Any, List, Optional, Text, Type, Union, Dict, Sequence
@@ -327,6 +328,18 @@ class FiniteMPS(BaseMPS):
     data['backend'] = backend
     return cls(**data)
 
+  def __getstate__(self):
+    return {
+      'tensors': self.tensors,
+      'center_position': self.center_position,
+      'backend': self.backend
+    }
+  
+  def __setstate__(self, state):
+    self.tensors = state['tensors']
+    self.center_position = state['center_position']
+    self.backend = state['backend']
+
   def fidelity(self, other: Tensor) -> float:
     if isinstance(other, BaseMPS):
       other = other.tensors
@@ -345,3 +358,37 @@ class FiniteMPS(BaseMPS):
       result = contract_between(result, other_conj[site])
 
     return self.backend.item(self.backend.abs(result.tensor)) ** 2
+  
+  @classmethod
+  def from_statevector(cls, statevector: Tensor,
+                        max_singular_values: Optional[int] = None,
+                        max_truncation_err: Optional[float] = None,
+                        backend: Optional[Union[Text, AbstractBackend]] = None):
+    """Initialize a `FiniteMPS` from a statevector.
+
+    Args:
+      statevector: State vector.
+      max_singular_values: maximun bond dimension for MPS.
+      max_truncation_err: (to be implemented).
+      backend: backend for tensor.
+
+    Returns:
+      `FiniteMPS`
+    """
+    state_vector = statevector.reshape(-1, 1)
+    num_sites = int(np.log2(state_vector.shape[0]))
+    tensors = []
+    for i in range(num_sites - 1):
+      state_vector = Node(state_vector.reshape(-1, 2, 2 ** (num_sites - i - 1), 1), backend=backend)
+      u, state_vector, err = split_node(
+        state_vector,
+        left_edges=[state_vector[0], state_vector[1]],
+        right_edges=[state_vector[2], state_vector[3]],
+        max_singular_values=max_singular_values,
+        max_truncation_err=max_truncation_err
+      )
+      state_vector = state_vector.tensor
+      tensors.append(u.tensor)
+    tensors.append(state_vector)
+    
+    return cls(tensors=tensors, backend=backend)

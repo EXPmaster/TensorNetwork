@@ -265,6 +265,13 @@ class BaseMPS:
   def left_envs(self, sites: Sequence[int]) -> Dict:
     raise NotImplementedError()
 
+  @classmethod
+  def from_statevector(cls, statevector: Tensor,
+                        max_bond_dimension: Optional[int] = None,
+                        max_truncation_err: Optional[float] = None,
+                        backend: Optional[Union[Text, AbstractBackend]] = None):
+    raise NotImplementedError()
+
   def apply_transfer_operator(self, site: int, direction: Union[Text, int],
                               matrix: Tensor) -> Tensor:
     """Compute the action of the MPS transfer-operator at site `site`.

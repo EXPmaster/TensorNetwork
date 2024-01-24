@@ -99,7 +99,7 @@ class PyTorchBackend(abstract_backend.AbstractBackend):
     return np.concatenate(values, axis)
 
   def shape_tensor(self, tensor: Tensor) -> Tensor:
-    return torchlib.tensor(list(tensor.shape))
+    return tuple(tensor.shape)
 
   def shape_tuple(self, tensor: Tensor) -> Tuple[Optional[int], ...]:
     return tuple(tensor.shape)
