@@ -271,6 +271,9 @@ class BaseMPS:
                         max_truncation_err: Optional[float] = None,
                         backend: Optional[Union[Text, AbstractBackend]] = None):
     raise NotImplementedError()
+  
+  def to_statevector(self) -> Tensor:
+    raise NotImplementedError()
 
   def apply_transfer_operator(self, site: int, direction: Union[Text, int],
                               matrix: Tensor) -> Tensor:
@@ -576,6 +579,7 @@ class BaseMPS:
           max_singular_values=max_singular_values,
           max_truncation_error=max_truncation_err,
           relative=relative)
+      S /= self.backend.norm(S)
       if center_position == site2:
         left_tensor = U
         right_tensor = ncon.ncon([self.backend.diagflat(S), V],

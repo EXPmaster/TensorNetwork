@@ -392,3 +392,18 @@ class FiniteMPS(BaseMPS):
     tensors.append(state_vector)
     
     return cls(tensors=tensors, backend=backend)
+
+  def to_statevector(self) -> Tensor:
+    """Convert MPS to state vector.
+
+    Returns:
+      `Tensor`: State vector.
+    """
+    state_nodes = [Node(tensor) for tensor in self.tensors]
+    for i in range(len(state_nodes) - 1):
+      state_nodes[i][2] ^ state_nodes[i + 1][0]
+    result = contract_between(state_nodes[0], state_nodes[1])
+    for i in range(2, len(state_nodes)):
+      result = contract_between(result, state_nodes[i])
+    state = result.tensor.reshape(-1)
+    return state

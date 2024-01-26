@@ -268,13 +268,13 @@ class FiniteTFI(FiniteMPO):
     self.Bz = Bz.astype(dtype)
     N = len(Bz)
     sigma_x = np.array([[0, 1], [1, 0]]).astype(dtype)
-    sigma_z = np.diag([-1, 1]).astype(dtype)
+    sigma_z = np.diag([1, -1]).astype(dtype)
     mpo = []
     temp = np.zeros(shape=[1, 3, 2, 2], dtype=dtype)
     #Bsigma_z
-    temp[0, 0, :, :] = self.Bz[0] * sigma_z
+    temp[0, 0, :, :] = self.Bz[0] * sigma_x
     #sigma_x
-    temp[0, 1, :, :] = self.Jx[0] * sigma_x
+    temp[0, 1, :, :] = self.Jx[0] * sigma_z
     #11
     temp[0, 2, 0, 0] = 1.0
     temp[0, 2, 1, 1] = 1.0
@@ -285,11 +285,11 @@ class FiniteTFI(FiniteMPO):
       temp[0, 0, 0, 0] = 1.0
       temp[0, 0, 1, 1] = 1.0
       #sigma_x
-      temp[1, 0, :, :] = sigma_x
+      temp[1, 0, :, :] = sigma_z
       #Bsigma_z
-      temp[2, 0, :, :] = self.Bz[n] * sigma_z
+      temp[2, 0, :, :] = self.Bz[n] * sigma_x
       #sigma_x
-      temp[2, 1, :, :] = self.Jx[n] * sigma_x
+      temp[2, 1, :, :] = self.Jx[n] * sigma_z
       #11
       temp[2, 2, 0, 0] = 1.0
       temp[2, 2, 1, 1] = 1.0
@@ -300,9 +300,9 @@ class FiniteTFI(FiniteMPO):
     temp[0, 0, 0, 0] = 1.0
     temp[0, 0, 1, 1] = 1.0
     #sigma_x
-    temp[1, 0, :, :] = sigma_x
+    temp[1, 0, :, :] = sigma_z
     #Bsigma_z
-    temp[2, 0, :, :] = self.Bz[-1] * sigma_z
+    temp[2, 0, :, :] = self.Bz[-1] * sigma_x
     mpo.append(temp)
     super().__init__(tensors=mpo, backend=backend, name=name)
 
