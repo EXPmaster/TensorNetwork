@@ -239,6 +239,97 @@ class FiniteXXZ(FiniteMPO):
     super().__init__(tensors=mpo, backend=backend, name=name)
 
 
+class FiniteHeisenberg(FiniteMPO):
+  """
+  The Heisenberg Hamiltonian.
+  H = Jx * Sx*Sx + Jy * Sy*Sy + Jz * Sz*Sz + h * Sz
+  """
+
+  def __init__(self,
+               Jx: np.ndarray,
+               Jy: np.ndarray,
+               Jz: np.ndarray,
+               Bz: np.ndarray,
+               dtype: Type[np.number],
+               backend: Optional[Union[AbstractBackend, Text]] = None,
+               name: Text = 'Heisenberg_MPO') -> None:
+    """
+    Returns the MPO of the finite Heisenberg model.
+    Args:
+      Jx: The Sx*Sx coupling strength between nearest neighbor lattice sites.
+      Jy: The Sy*Sy coupling strength between nearest neighbor lattice sites.
+      Jz: The Sz*Sz coupling strength between nearest neighbor lattice sites.
+      Bz: Magnetic field on each lattice site.
+      dtype: The dtype of the MPO.
+      backend: An optional backend.
+      name: A name for the MPO.
+    Returns:
+      FiniteHeisenberg: The mpo of the finite Heisenberg model.
+    """
+    self.Jz = Jz
+    self.Jx = Jx
+    self.Jy = Jy
+    self.Bz = Bz
+    sigma_x = np.array([[0, 1], [1, 0]]).astype(dtype)
+    sigma_y = np.array([[0, -1j], [1j, 0]]).astype(dtype)
+    sigma_z = np.diag([1, -1]).astype(dtype)
+    sigma_i = np.eye(2).astype(dtype)
+    N = len(Bz)
+    mpo = []
+    temp = np.zeros((1, 5, 2, 2), dtype=dtype)
+    #BSz
+    temp[0, 0, :, :] = Bz[0] * sigma_z
+
+    #Sx
+    temp[0, 1, :, :] = Jx[0] * sigma_x
+    #Sy
+    temp[0, 2, :, :] = Jy[0] * sigma_y
+    #Sz
+    temp[0, 3, :, :] = Jz[0] * sigma_z
+
+    #11
+    temp[0, 4, :, :] = sigma_i
+    mpo.append(temp)
+
+    for n in range(1, N - 1):
+      temp = np.zeros((5, 5, 2, 2), dtype=dtype)
+      #11
+      temp[0, 0, :, :] = sigma_i
+      #Sx
+      temp[1, 0, :, :] = sigma_x
+      #Sy
+      temp[2, 0, :, :] = sigma_y
+      #Sz
+      temp[3, 0, :, :] = sigma_z
+      #BSz
+      temp[4, 0, :, :] = Bz[n] * sigma_z
+
+      #Sx
+      temp[4, 1, :, :] = Jx[n] * sigma_x
+      #Sy
+      temp[4, 2, :, :] = Jy[n] * sigma_y
+      #Sz
+      temp[4, 3, :, :] = Jz[n] * sigma_z
+      #11
+      temp[4, 4, :, :] = sigma_i
+
+      mpo.append(temp)
+    temp = np.zeros((5, 1, 2, 2), dtype=dtype)
+    #11
+    temp[0, 0, :, :] = sigma_i
+    #Sx
+    temp[1, 0, :, :] = sigma_x
+    #Sy
+    temp[2, 0, :, :] = sigma_y
+    #Sz
+    temp[3, 0, :, :] = sigma_z
+    #BSz
+    temp[4, 0, :, :] = Bz[-1] * sigma_z
+
+    mpo.append(temp)
+    super().__init__(tensors=mpo, backend=backend, name=name)
+
+
 class FiniteTFI(FiniteMPO):
   """
   The famous transverse field Ising Hamiltonian.
