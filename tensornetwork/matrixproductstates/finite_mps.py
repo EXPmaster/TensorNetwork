@@ -399,7 +399,7 @@ class FiniteMPS(BaseMPS):
     Returns:
       `Tensor`: State vector.
     """
-    state_nodes = [Node(tensor) for tensor in self.tensors]
+    state_nodes = [Node(tensor, backend=self.backend) for tensor in self.tensors]
     for i in range(len(state_nodes) - 1):
       state_nodes[i][2] ^ state_nodes[i + 1][0]
     result = contract_between(state_nodes[0], state_nodes[1])

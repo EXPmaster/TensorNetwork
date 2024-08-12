@@ -80,7 +80,9 @@ def svd(
   right_dims = list(tensor.shape)[pivot_axis:]
 
   tensor = torch.reshape(tensor, (np.prod(left_dims), np.prod(right_dims)))
-  u, s, vh = torch.linalg.svd(tensor, full_matrices=False)
+  u, s, vh = torch.linalg.svd(tensor.type(torch.complex128), full_matrices=False)
+  u = u.type(tensor.type())
+  vh = vh.type(tensor.type())
 
   if max_singular_values is None:
     max_singular_values = s.nelement()
@@ -157,7 +159,9 @@ def qr(
   right_dims = list(tensor.shape)[pivot_axis:]
 
   tensor = torch.reshape(tensor, (np.prod(left_dims), np.prod(right_dims)))
-  q, r = torch.linalg.qr(tensor)
+  q, r = torch.linalg.qr(tensor.type(torch.complex128))
+  q = q.type(tensor.type())
+  r = r.type(tensor.type())
   if non_negative_diagonal:
     phases = torch.sign(torch.diagonal(r))
     q = q * phases
@@ -206,7 +210,9 @@ def rq(
   right_dims = tensor.shape[pivot_axis:]
   tensor = torch.reshape(tensor, [np.prod(left_dims), np.prod(right_dims)])
   #torch has currently no support for complex dtypes
-  q, r = torch.linalg.qr(torch.transpose(tensor.conj(), 0, 1))
+  q, r = torch.linalg.qr(torch.transpose(tensor.conj().type(torch.complex128), 0, 1))
+  q = q.type(tensor.type())
+  r = r.type(tensor.type())
   if non_negative_diagonal:
     phases = torch.sign(torch.diagonal(r))
     q = q * phases
