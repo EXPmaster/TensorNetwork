@@ -495,3 +495,115 @@ class FiniteFreeFermion2D(FiniteMPO):
     mpo_matrix[2 * N1 + 1, 0, :, :] = v * particle_number
     mpo.append(mpo_matrix)
     super().__init__(tensors=mpo, backend=backend, name=name)
+
+
+class Finite2DTFI(FiniteMPO):
+  """
+  Transverse-field Ising model on a 2D N1 x N2 lattice.
+  H = Jv * sum_{c,r} Z_(c,r)*Z_(c,r+1)  (vertical NN bonds within columns)
+    + Jh * sum_{r,c} Z_(r,c)*Z_(r,c+1)  (horizontal NN bonds between columns)
+    + sum_n Bz[n] * X_n                  (site-dependent transverse field)
+
+  Sites are ordered in column-major (snake) order: (row r, col c) -> n = c*N1 + r.
+  This makes vertical bonds nearest-neighbor in 1D (distance 1) and horizontal
+  bonds long-range (distance N1), handled via MPO carriers.
+
+  Virtual bond dimension: D = N1 + 3.
+    State 0:      H accumulator.
+    State 1:      Vertical Z carrier (active for 1 bond within a column).
+    States 2+j:   Horizontal Z carrier for row j (j=0..N1-1), travels N1 steps.
+    State N1+2:   Incoming identity (I right).
+  """
+
+  def __init__(self,
+               Jv: float,
+               Jh: float,
+               Bz: np.ndarray,
+               N1: int,
+               N2: int,
+               dtype: Type[np.number],
+               backend: Optional[Union[AbstractBackend, Text]] = None,
+               name: Text = '2DTFI_MPO') -> None:
+    """
+    Returns the MPO of the 2D TFI model on an N1 x N2 grid.
+
+    Args:
+      Jv:  Vertical ZZ coupling (scalar, uniform across all vertical bonds).
+      Jh:  Horizontal ZZ coupling (scalar, uniform across all horizontal bonds).
+      Bz:  Transverse field per site, shape (N1*N2,) in column-major order.
+      N1:  Number of rows.
+      N2:  Number of columns.
+      dtype: The dtype of the MPO.
+      backend: An optional backend.
+      name: A name for the MPO.
+
+    Returns:
+      Finite2DTFI: The MPO of the 2D TFI model.
+    """
+    self.N1 = N1
+    self.N2 = N2
+    N = N1 * N2
+
+    Bz = np.asarray(Bz, dtype=dtype)
+    assert len(Bz) == N, f'Bz must have length N1*N2={N}, got {len(Bz)}'
+
+    eye = np.eye(2).astype(dtype)
+    sigma_x = np.array([[0, 1], [1, 0]]).astype(dtype)
+    sigma_z = np.diag([1, -1]).astype(dtype)
+
+    D = N1 + 3  # virtual bond dimension
+    mpo = []
+
+    # First tensor: site n=0, r=0, c=0, shape (1, D, 2, 2)
+    W = np.zeros((1, D, 2, 2), dtype=dtype)
+    W[0, 0] = Bz[0] * sigma_x          # transverse field at site 0 -> H
+    if N1 > 1:
+      W[0, 1] = Jv * sigma_z           # launch vertical Z carrier for bond (r=0,c=0)-(r=1,c=0)
+    if N2 > 1:
+      W[0, 2 + 0] = Jh * sigma_z       # launch horizontal Z carrier for row 0
+    W[0, N1 + 2] = eye                 # pass identity right
+    mpo.append(W)
+
+    # Interior tensors: sites n = 1 .. N-2
+    for n in range(1, N - 1):
+      r = n % N1   # row index in column-major order
+      c = n // N1  # column index
+
+      W = np.zeros((D, D, 2, 2), dtype=dtype)
+      W[0, 0] = eye                    # H accumulator passes through
+
+      if r > 0:
+        W[1, 0] = sigma_z              # close vertical Z carrier: Z_n closes ZZ with site n-1
+
+      if c > 0:
+        W[2 + r, 0] = sigma_z          # close horizontal Z carrier for row r: ZZ with site n-N1
+
+      # Propagate horizontal carriers for all rows j != r (they stay active)
+      for j in range(N1):
+        if j != r:
+          W[2 + j, 2 + j] = eye
+
+      W[N1 + 2, 0] = Bz[n] * sigma_x  # transverse field at site n -> H
+
+      if r < N1 - 1:
+        W[N1 + 2, 1] = Jv * sigma_z   # launch vertical Z carrier for bond n-(n+1)
+
+      if c < N2 - 1:
+        W[N1 + 2, 2 + r] = Jh * sigma_z  # launch horizontal Z carrier for row r
+
+      W[N1 + 2, N1 + 2] = eye         # pass identity right
+      mpo.append(W)
+
+    # Last tensor: site n=N-1, r=N1-1, c=N2-1, shape (D, 1, 2, 2)
+    r = N1 - 1
+    c = N2 - 1
+    W = np.zeros((D, 1, 2, 2), dtype=dtype)
+    W[0, 0] = eye                      # H accumulator
+    if r > 0:
+      W[1, 0] = sigma_z                # close vertical Z carrier (r=N1-1 > 0 always)
+    if c > 0:
+      W[2 + r, 0] = sigma_z            # close horizontal Z carrier for last row
+    W[N1 + 2, 0] = Bz[-1] * sigma_x   # transverse field at last site
+    mpo.append(W)
+
+    super().__init__(tensors=mpo, backend=backend, name=name)
